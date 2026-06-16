@@ -51,7 +51,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   controller: _urlCtrl,
                   decoration: const InputDecoration(
                     labelText: '弹幕服务器地址',
-                    hintText: 'http://192.168.x.x:9321',
+                    hintText: 'http://192.168.100.10:9321/87654321',
                     border: OutlineInputBorder(),
                     helperText: '弹弹play 兼容 API，部署在 NAS 或局域网',
                   ),

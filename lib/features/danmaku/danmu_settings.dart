@@ -87,7 +87,8 @@ class DanmuSettingsNotifier extends Notifier<DanmuSettingsState> {
     _cache = DanmuSourceCache(_prefs!);
     state = DanmuSettingsState(
       loaded: true,
-      danmuUrl: _prefs!.getString('danmu_url') ?? '',
+      danmuUrl: _prefs!.getString('danmu_url') ??
+          'http://192.168.100.10:9321/87654321',
       enabled: _prefs!.getBool('danmu_on') ?? true,
       opacity: _prefs!.getDouble('danmu_opacity') ?? 0.85,
       fontSize: _prefs!.getDouble('danmu_fontsize') ?? 22,
