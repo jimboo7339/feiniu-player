@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/format_utils.dart';
 import '../../data/feiniu/feiniu_providers.dart';
 import '../../data/feiniu/models/media_models.dart';
 import '../player/player_screen.dart';
@@ -201,12 +202,46 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                                 const Divider(height: 1),
                             itemBuilder: (context, index) {
                               final ep = episodes[index];
+                              final progress = ep.watchProgress;
                               return ListTile(
-                                leading:
-                                    const Icon(Icons.play_circle_outline),
+                                leading: CircleAvatar(
+                                  backgroundColor: progress > 0
+                                      ? Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withAlpha(40)
+                                      : null,
+                                  child: progress > 0
+                                      ? Icon(
+                                          Icons.play_arrow,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                        )
+                                      : Text('${index + 1}'),
+                                ),
                                 title: Text(ep.title),
                                 subtitle: ep.watchedTs > 0
-                                    ? Text('已观看 ${_formatTs(ep.watchedTs)}')
+                                    ? Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            ep.durationSeconds > 0
+                                                ? '已观看 ${formatDuration(ep.watchedTs)} / ${formatDuration(ep.durationSeconds)}'
+                                                : '已观看 ${formatDuration(ep.watchedTs)}',
+                                          ),
+                                          if (progress > 0) ...[
+                                            const SizedBox(height: 4),
+                                            LinearProgressIndicator(
+                                              value: progress,
+                                              minHeight: 2,
+                                              borderRadius:
+                                                  BorderRadius.circular(1),
+                                            ),
+                                          ],
+                                        ],
+                                      )
                                     : null,
                                 onTap: () => _openPlayer(
                                   ep.guid,
@@ -225,11 +260,5 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
         },
       ),
     );
-  }
-
-  String _formatTs(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
   }
 }

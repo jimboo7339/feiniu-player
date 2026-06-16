@@ -20,6 +20,8 @@ class DanmuOverlay extends StatefulWidget {
     this.showOutline = true,
     this.speed = 0.6,
     this.topMargin = 0,
+    this.topOffsetPercent = 0,
+    this.mergeDuplicates = true,
     this.showScroll = true,
     this.showTop = true,
     this.showBottom = true,
@@ -36,6 +38,8 @@ class DanmuOverlay extends StatefulWidget {
   final bool showOutline;
   final double speed;
   final double topMargin;
+  final int topOffsetPercent;
+  final bool mergeDuplicates;
   final bool showScroll;
   final bool showTop;
   final bool showBottom;
@@ -155,6 +159,7 @@ class _DanmuOverlayState extends State<DanmuOverlay>
   void _updateDanmu(double curSec, double staticDt) {
     final comments = widget.comments;
     final lnH = widget.fontSize * 1.5;
+    final topOffset = _size.height * widget.topOffsetPercent / 100;
     final areaH = _size.height * widget.areaPercent / 100;
     final maxRow = max(1, (areaH / lnH).floor());
     const densityWindow = 0.35;
@@ -197,6 +202,14 @@ class _DanmuOverlayState extends State<DanmuOverlay>
 
       final key = (c.time * 1000).round();
       if (_firedKeys.contains(key)) continue;
+
+      if (widget.mergeDuplicates && c.type == 1) {
+        final dup = _activeScroll.any(
+          (a) => a.text == c.text && (curSec - a.time).abs() < 2.0,
+        );
+        if (dup) continue;
+      }
+
       _firedKeys.add(key);
 
       if (c.type == 4 || c.type == 5) {
@@ -210,7 +223,7 @@ class _DanmuOverlayState extends State<DanmuOverlay>
         item.x = (_size.width - item.tw) / 2;
         if (c.type == 5) {
           final topCount = _activeStatic.where((a) => a.type == 5).length;
-          item.y = widget.topMargin + lnH + topCount * lnH;
+          item.y = widget.topMargin + topOffset + lnH + topCount * lnH;
         } else {
           final bottomCount = _activeStatic.where((a) => a.type == 4).length;
           item.y = _size.height - lnH * 0.2 - bottomCount * lnH;
@@ -227,7 +240,7 @@ class _DanmuOverlayState extends State<DanmuOverlay>
         item.tw = _measureText(c.text);
         final row = _nextRow;
         _nextRow = (_nextRow + 1) % maxRow;
-        item.y = widget.topMargin + lnH + row * lnH;
+        item.y = widget.topMargin + topOffset + lnH + row * lnH;
         _activeScroll.add(item);
       }
     }

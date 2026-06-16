@@ -6,6 +6,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/danmu_comment.dart';
 
+class DanmuAnimeResult {
+  const DanmuAnimeResult({
+    required this.animeId,
+    required this.animeName,
+    this.typeDescription = '',
+    this.episodeCount = 0,
+  });
+
+  final int animeId;
+  final String animeName;
+  final String typeDescription;
+  final int episodeCount;
+}
+
 class DanmuLoadResult {
   const DanmuLoadResult({required this.comments, required this.source});
 
@@ -25,6 +39,7 @@ class DanmuService {
     required int episodeNumber,
     Map<String, dynamic>? cachedSource,
     void Function(Map<String, dynamic> source)? onSourceCached,
+    bool withRelated = true,
   }) async {
     if (danmuBaseUrl.isEmpty) return null;
 
@@ -32,7 +47,8 @@ class DanmuService {
         cachedSource['episodeNumber'] == episodeNumber &&
         cachedSource['episodeId'] != null) {
       final episodeId = cachedSource['episodeId'] as int;
-      final comments = await _fetchComments(danmuBaseUrl, episodeId);
+      final comments = await _fetchComments(danmuBaseUrl, episodeId,
+          withRelated: withRelated);
       if (comments == null) return null;
       return DanmuLoadResult(comments: comments, source: cachedSource);
     }
@@ -42,17 +58,118 @@ class DanmuService {
       matchName,
       episodeNumber,
       onSourceCached,
+      withRelated: withRelated,
     );
+  }
+
+  /// 搜索可选弹幕源列表，供用户手动选择。
+  Future<List<DanmuAnimeResult>> searchAnime({
+    required String danmuBaseUrl,
+    required String keyword,
+  }) async {
+    if (danmuBaseUrl.isEmpty || keyword.trim().isEmpty) return [];
+    try {
+      final searchResp = await _dio.get<Map<String, dynamic>>(
+        '$danmuBaseUrl/api/v2/search/anime',
+        queryParameters: {'keyword': keyword.trim()},
+      );
+      if (searchResp.statusCode != 200 || searchResp.data == null) return [];
+
+      final results = _extractList(
+        searchResp.data,
+        const ['animes', 'data', 'bangumi'],
+      );
+      return results.whereType<Map>().map((raw) {
+        final m = Map<String, dynamic>.from(raw);
+        return DanmuAnimeResult(
+          animeId: _asInt(m['animeId'] ?? m['id'] ?? m['bangumiId']),
+          animeName: (m['animeName'] ?? m['name'] ?? '').toString(),
+          typeDescription: (m['typeDescription'] ?? m['type'] ?? '').toString(),
+          episodeCount: _asInt(m['episodesCount'] ?? m['episodeCount']),
+        );
+      }).where((r) => r.animeId > 0 && r.animeName.isNotEmpty).toList();
+    } catch (e) {
+      debugPrint('Danmu searchAnime error: $e');
+      return [];
+    }
+  }
+
+  /// 从指定番剧加载弹幕（用户手动选择源）。
+  Future<DanmuLoadResult?> loadFromAnime({
+    required String danmuBaseUrl,
+    required int animeId,
+    required String animeName,
+    required int episodeNumber,
+    bool withRelated = true,
+  }) async {
+    if (danmuBaseUrl.isEmpty || animeId == 0) return null;
+    try {
+      final bangumiResp = await _dio.get<Map<String, dynamic>>(
+        '$danmuBaseUrl/api/v2/bangumi/$animeId',
+      );
+      if (bangumiResp.statusCode != 200 || bangumiResp.data == null) {
+        return null;
+      }
+
+      final episodes = _extractEpisodes(bangumiResp.data!);
+      if (episodes.isEmpty) return null;
+
+      var episodeId = 0;
+      var commentCount = 0;
+      if (episodeNumber > 0) {
+        for (final ep in episodes) {
+          if (ep is! Map) continue;
+          if (_parseEpisodeNum(ep) == episodeNumber) {
+            episodeId = ep['episodeId'] ?? ep['id'] ?? 0;
+            commentCount = ep['commentCount'] ?? 0;
+            break;
+          }
+        }
+      }
+      if (episodeId == 0) {
+        final firstEp = episodes.first as Map<String, dynamic>;
+        episodeId = firstEp['episodeId'] ?? firstEp['id'] ?? 0;
+        commentCount = firstEp['commentCount'] ?? 0;
+      }
+      if (episodeId == 0) return null;
+
+      final comments = await _fetchComments(
+        danmuBaseUrl,
+        episodeId,
+        withRelated: withRelated,
+      );
+      if (comments == null) return null;
+
+      return DanmuLoadResult(
+        comments: comments,
+        source: {
+          'animeId': animeId,
+          'animeName': animeName,
+          'episodeId': episodeId,
+          'episodeNumber': episodeNumber,
+          'commentCount':
+              commentCount > 0 ? commentCount : comments.length,
+        },
+      );
+    } catch (e) {
+      debugPrint('Danmu loadFromAnime error: $e');
+      return null;
+    }
   }
 
   Future<DanmuLoadResult?> loadFromSource({
     required String danmuBaseUrl,
     required Map<String, dynamic> source,
+    bool withRelated = true,
   }) async {
     if (danmuBaseUrl.isEmpty) return null;
     final episodeId = source['episodeId'] as int? ?? 0;
     if (episodeId == 0) return null;
-    final comments = await _fetchComments(danmuBaseUrl, episodeId);
+    final comments = await _fetchComments(
+      danmuBaseUrl,
+      episodeId,
+      withRelated: withRelated,
+    );
     if (comments == null) return null;
     return DanmuLoadResult(comments: comments, source: source);
   }
@@ -61,8 +178,9 @@ class DanmuService {
     String danmuBaseUrl,
     String matchName,
     int episodeNumber,
-    void Function(Map<String, dynamic> source)? onSourceCached,
-  ) async {
+    void Function(Map<String, dynamic> source)? onSourceCached, {
+    bool withRelated = true,
+  }) async {
     try {
       final searchResp = await _dio.get<Map<String, dynamic>>(
         '$danmuBaseUrl/api/v2/search/anime',
@@ -111,7 +229,8 @@ class DanmuService {
       }
       if (episodeId == 0) return null;
 
-      final comments = await _fetchComments(danmuBaseUrl, episodeId);
+      final comments = await _fetchComments(danmuBaseUrl, episodeId,
+          withRelated: withRelated);
       if (comments == null) return null;
 
       final sourceData = {
@@ -133,12 +252,13 @@ class DanmuService {
 
   Future<List<DanmuComment>?> _fetchComments(
     String danmuBaseUrl,
-    int episodeId,
-  ) async {
+    int episodeId, {
+    bool withRelated = true,
+  }) async {
     try {
       final resp = await _dio.get<Map<String, dynamic>>(
         '$danmuBaseUrl/api/v2/comment/$episodeId',
-        queryParameters: {'withRelated': 'true'},
+        queryParameters: {'withRelated': withRelated ? 'true' : 'false'},
       );
       if (resp.statusCode != 200 || resp.data == null) return null;
       final rawList = _extractList(resp.data, const ['comments', 'data']);
@@ -228,6 +348,13 @@ class DanmuService {
     final rawNum = ep['episodeNumber'] ?? ep['episodeIndex'] ?? ep['ep'];
     if (rawNum is int) return rawNum;
     if (rawNum is String) return int.tryParse(rawNum) ?? 0;
+    return 0;
+  }
+
+  int _asInt(dynamic v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
     return 0;
   }
 }

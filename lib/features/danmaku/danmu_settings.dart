@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,11 +14,14 @@ class DanmuSettingsState {
     this.opacity = 0.85,
     this.fontSize = 22,
     this.areaPercent = 35,
+    this.topOffsetPercent = 0,
     this.speed = 0.6,
     this.showScroll = true,
     this.showTop = true,
     this.showBottom = true,
     this.showOutline = true,
+    this.mergeDuplicates = true,
+    this.withRelated = true,
   });
 
   final bool loaded;
@@ -26,11 +30,14 @@ class DanmuSettingsState {
   final double opacity;
   final double fontSize;
   final int areaPercent;
+  final int topOffsetPercent;
   final double speed;
   final bool showScroll;
   final bool showTop;
   final bool showBottom;
   final bool showOutline;
+  final bool mergeDuplicates;
+  final bool withRelated;
 
   DanmuSettingsState copyWith({
     bool? loaded,
@@ -39,11 +46,14 @@ class DanmuSettingsState {
     double? opacity,
     double? fontSize,
     int? areaPercent,
+    int? topOffsetPercent,
     double? speed,
     bool? showScroll,
     bool? showTop,
     bool? showBottom,
     bool? showOutline,
+    bool? mergeDuplicates,
+    bool? withRelated,
   }) {
     return DanmuSettingsState(
       loaded: loaded ?? this.loaded,
@@ -52,11 +62,14 @@ class DanmuSettingsState {
       opacity: opacity ?? this.opacity,
       fontSize: fontSize ?? this.fontSize,
       areaPercent: areaPercent ?? this.areaPercent,
+      topOffsetPercent: topOffsetPercent ?? this.topOffsetPercent,
       speed: speed ?? this.speed,
       showScroll: showScroll ?? this.showScroll,
       showTop: showTop ?? this.showTop,
       showBottom: showBottom ?? this.showBottom,
       showOutline: showOutline ?? this.showOutline,
+      mergeDuplicates: mergeDuplicates ?? this.mergeDuplicates,
+      withRelated: withRelated ?? this.withRelated,
     );
   }
 }
@@ -93,11 +106,14 @@ class DanmuSettingsNotifier extends Notifier<DanmuSettingsState> {
       opacity: _prefs!.getDouble('danmu_opacity') ?? 0.85,
       fontSize: _prefs!.getDouble('danmu_fontsize') ?? 22,
       areaPercent: _prefs!.getInt('danmu_area') ?? 35,
+      topOffsetPercent: _prefs!.getInt('danmu_top_offset') ?? 0,
       speed: _prefs!.getDouble('danmu_speed') ?? 0.6,
       showScroll: _prefs!.getBool('danmu_scroll') ?? true,
       showTop: _prefs!.getBool('danmu_top') ?? true,
       showBottom: _prefs!.getBool('danmu_bottom') ?? true,
       showOutline: _prefs!.getBool('danmu_outline') ?? true,
+      mergeDuplicates: _prefs!.getBool('danmu_merge') ?? true,
+      withRelated: _prefs!.getBool('danmu_related') ?? true,
     );
   }
 
@@ -126,8 +142,108 @@ class DanmuSettingsNotifier extends Notifier<DanmuSettingsState> {
     state = state.copyWith(areaPercent: v);
   }
 
+  Future<void> setTopOffsetPercent(int v) async {
+    await _prefs?.setInt('danmu_top_offset', v);
+    state = state.copyWith(topOffsetPercent: v);
+  }
+
   Future<void> setSpeed(double v) async {
     await _prefs?.setDouble('danmu_speed', v);
     state = state.copyWith(speed: v);
+  }
+
+  Future<void> setShowScroll(bool v) async {
+    await _prefs?.setBool('danmu_scroll', v);
+    state = state.copyWith(showScroll: v);
+  }
+
+  Future<void> setShowTop(bool v) async {
+    await _prefs?.setBool('danmu_top', v);
+    state = state.copyWith(showTop: v);
+  }
+
+  Future<void> setShowBottom(bool v) async {
+    await _prefs?.setBool('danmu_bottom', v);
+    state = state.copyWith(showBottom: v);
+  }
+
+  Future<void> setShowOutline(bool v) async {
+    await _prefs?.setBool('danmu_outline', v);
+    state = state.copyWith(showOutline: v);
+  }
+
+  Future<void> setMergeDuplicates(bool v) async {
+    await _prefs?.setBool('danmu_merge', v);
+    state = state.copyWith(mergeDuplicates: v);
+  }
+
+  Future<void> setWithRelated(bool v) async {
+    await _prefs?.setBool('danmu_related', v);
+    state = state.copyWith(withRelated: v);
+  }
+}
+
+/// 通用设置区块标题
+class SettingsSection extends StatelessWidget {
+  const SettingsSection({super.key, required this.title, this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          if (subtitle != null)
+            Text(
+              subtitle!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white54,
+                  ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 带标签的滑块设置项
+class SettingsSliderTile extends StatelessWidget {
+  const SettingsSliderTile({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    this.divisions,
+    this.displayValue,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final int? divisions;
+  final String? displayValue;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(displayValue ?? label),
+      subtitle: Slider(
+        value: value.clamp(min, max),
+        min: min,
+        max: max,
+        divisions: divisions,
+        onChanged: onChanged,
+      ),
+    );
   }
 }

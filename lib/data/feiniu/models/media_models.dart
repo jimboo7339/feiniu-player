@@ -5,20 +5,32 @@ class MediaItem {
     required this.type,
     this.poster,
     this.watchedTs = 0,
+    this.durationSeconds = 0,
     this.releaseDate,
     this.voteAverage,
     this.ancestorName,
   });
 
   factory MediaItem.fromJson(Map<String, dynamic> json) {
+    final rawTs = (json['watched_ts'] as num?)?.toInt() ??
+        (json['ts'] as num?)?.toInt() ??
+        0;
+    // 部分接口 ts 为毫秒，>100000 时按秒处理
+    final watchedTs = rawTs > 100000 ? rawTs ~/ 1000 : rawTs;
+
+    final rawDur = (json['duration'] as num?)?.toInt() ??
+        (json['media_duration'] as num?)?.toInt() ??
+        (json['runtime'] as num?)?.toInt() ??
+        0;
+    final durationSeconds = rawDur > 100000 ? rawDur ~/ 1000 : rawDur;
+
     return MediaItem(
       guid: json['guid']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       type: json['type']?.toString() ?? '',
       poster: json['poster']?.toString(),
-      watchedTs: (json['watched_ts'] as num?)?.toInt() ??
-          (json['ts'] as num?)?.toInt() ??
-          0,
+      watchedTs: watchedTs,
+      durationSeconds: durationSeconds,
       releaseDate: json['release_date']?.toString(),
       voteAverage: json['vote_average']?.toString(),
       ancestorName: json['ancestor_name']?.toString(),
@@ -30,9 +42,17 @@ class MediaItem {
   final String type;
   final String? poster;
   final int watchedTs;
+  final int durationSeconds;
   final String? releaseDate;
   final String? voteAverage;
   final String? ancestorName;
+
+  double get watchProgress {
+    if (watchedTs <= 0 || durationSeconds <= 0) return 0;
+    return (watchedTs / durationSeconds).clamp(0.0, 1.0);
+  }
+
+  bool get hasWatchProgress => watchedTs > 0;
 }
 
 class MediaLibrary {

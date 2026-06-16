@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/feiniu/feiniu_providers.dart';
 import '../../data/feiniu/models/media_models.dart';
+import '../../widgets/poster_card.dart';
 import '../auth/auth_controller.dart';
 import '../detail/detail_screen.dart';
 import '../player/player_screen.dart';
@@ -58,6 +59,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateProvider);
     final homeAsync = ref.watch(homeDataProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -69,7 +71,9 @@ class HomeScreen extends ConsumerWidget {
                 padding: const EdgeInsets.only(right: 8),
                 child: Text(
                   auth.serverVersion,
-                  style: Theme.of(context).textTheme.labelSmall,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: Colors.white54,
+                  ),
                 ),
               ),
             ),
@@ -115,23 +119,31 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               children: [
                 if (data.continueWatching.isNotEmpty) ...[
-                  Text('继续观看', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.history, size: 20, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text('继续观看', style: theme.textTheme.titleMedium),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   SizedBox(
-                    height: 140,
+                    height: 200,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: data.continueWatching.length,
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         final item = data.continueWatching[index];
-                        return _PosterCard(
+                        final api = ref.read(feiniuApiProvider);
+                        return PosterCard(
                           title: item.title,
-                          subtitle: item.type,
-                          imageUrl: ref
-                              .read(feiniuApiProvider)
-                              .imageUrl(item.poster, width: 200),
-                          headers: ref.read(feiniuApiProvider).client.imageHeaders,
+                          subtitle: item.ancestorName ?? item.type,
+                          imageUrl: api.imageUrl(item.poster, width: 240),
+                          headers: api.client.imageHeaders,
+                          width: 130,
+                          watchedSeconds: item.watchedTs,
+                          durationSeconds: item.durationSeconds,
                           onTap: () {
                             if (item.type == 'Episode') {
                               Navigator.push(
@@ -157,29 +169,31 @@ class HomeScreen extends ConsumerWidget {
                       },
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
                 ],
                 ...data.libraries.entries.map((entry) {
                   final library = entry.key;
                   final items = entry.value;
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
+                    padding: const EdgeInsets.only(bottom: 28),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           library.title,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: theme.textTheme.titleMedium,
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         if (items.isEmpty)
                           Text(
                             '暂无内容',
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.white54,
+                            ),
                           )
                         else
                           SizedBox(
-                            height: 180,
+                            height: 210,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: items.length,
@@ -187,23 +201,21 @@ class HomeScreen extends ConsumerWidget {
                                   const SizedBox(width: 12),
                               itemBuilder: (context, index) {
                                 final item = items[index];
-                                return _PosterCard(
+                                final api = ref.read(feiniuApiProvider);
+                                return PosterCard(
                                   title: item.title,
                                   subtitle: item.type,
-                                  imageUrl: ref
-                                      .read(feiniuApiProvider)
-                                      .imageUrl(item.poster, width: 240),
-                                  headers: ref
-                                      .read(feiniuApiProvider)
-                                      .client
-                                      .imageHeaders,
-                                  width: 120,
+                                  imageUrl:
+                                      api.imageUrl(item.poster, width: 240),
+                                  headers: api.client.imageHeaders,
+                                  width: 130,
                                   onTap: () {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) =>
-                                            DetailScreen(itemGuid: item.guid),
+                                        builder: (_) => DetailScreen(
+                                          itemGuid: item.guid,
+                                        ),
                                       ),
                                     );
                                   },
@@ -219,75 +231,6 @@ class HomeScreen extends ConsumerWidget {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _PosterCard extends StatelessWidget {
-  const _PosterCard({
-    required this.title,
-    required this.subtitle,
-    required this.imageUrl,
-    required this.headers,
-    this.width = 100,
-    this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final String imageUrl;
-  final Map<String, String> headers;
-  final double width;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AspectRatio(
-            aspectRatio: 2 / 3,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: imageUrl.isEmpty
-                  ? ColoredBox(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      child: const Icon(Icons.movie_outlined, size: 36),
-                    )
-                  : Image.network(
-                      imageUrl,
-                      headers: headers,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => ColoredBox(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                        child: const Icon(Icons.broken_image_outlined),
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
-          Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelSmall,
-          ),
-        ],
-        ),
       ),
     );
   }

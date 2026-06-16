@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../core/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
@@ -22,13 +24,7 @@ class FeiniuPlayerApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Feiniu Player',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4CAF50),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.dark(),
       home: !auth.initialized
           ? const _SplashScreen()
           : auth.isLoggedIn
