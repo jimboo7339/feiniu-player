@@ -1,0 +1,52 @@
+name: Build Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          if [ "$VERSION" = "$GITHUB_REF" ]; then VERSION="0.0.0-ci"; fi
+          flutter build apk --release \
+            --build-name="${VERSION}" \
+            --build-number="${{ github.run_number }}"
+
+      - name: Rename APK
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          if [ "$VERSION" = "$GITHUB_REF" ]; then VERSION="manual-${{ github.run_number }}"; fi
+          APK=$(find build/app/outputs/flutter-apk -name "*.apk" | head -1)
+          cp "$APK" "FeiniuPlayer_${VERSION}_android.apk"
+          ls -lh FeiniuPlayer_*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: FeiniuPlayer_*.apk
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: FeiniuPlayer_*.apk
+          generate_release_notes: true
